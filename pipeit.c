@@ -11,42 +11,48 @@
 
 int main(){
 
-  pid_t pid;
-	
+  pid_t pid;	
 	int pipefd[2];
-
-      
+	int status;
 
   int fd = open("outfile", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   
-  dup2(fd, 1);   // make stdout go to file
-  dup2(fd, 2);   
+  if (fd != -1) {
   
-  close(fd);
+    dup2(fd, 1);   /* make stdout go to outfile */
+    dup2(fd, 2);       
+    close(fd);        
+  	pipe(pipefd);
+    
+    if ((pid = fork()) == 0) {  /* child */
+  
+      close(pipefd[0]);
+      dup2(pipefd[1], 1);
+      dup2(pipefd[1], 2);
+      close(pipefd[1]); 
       
-	pipe(pipefd);
+      execlp("ls", "ls", "-1", NULL);  
+    
+    } else { /* parent */
   
-  if ((pid = fork()) == 0) {  //child
-
-    close(pipefd[0]);    // close reading end in the child    
-    dup2(pipefd[1], 1);  // send stdout to the pipe
-    dup2(pipefd[1], 2);  // send stderr to the pipe    
-    close(pipefd[1]); 
-    
-    execlp("ls", "ls", "-1", NULL);  
   
-  } else { // parent
-
-
-    close(pipefd[1]);  // close the write end of the pipe in the parent
+      close(pipefd[WRITE_END]);
+      
+      dup2(pipefd[0], 0);
+      
+      close(pipefd[READ_END]);
+  
+      execlp("sort", "sort","-r", NULL);
+      
+    }
     
-    dup2(pipefd[0],0);
-    close(pipefd[0]);
+    return 1;
 
-    execlp("sort", "sort","-r", NULL);
-    
-    exit(0);  
+  } else {  
+  
+    printf("outfile: Permission denied\n");
+    exit(1);
+  
   }
   
-  return 1;
 }
